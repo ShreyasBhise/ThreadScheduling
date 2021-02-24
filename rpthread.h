@@ -21,6 +21,7 @@
 #define READY 0
 #define SCHEDULED 1
 #define BLOCKED 2
+#define STK_SIZE SIGSTKSZ
 
 /* include lib header files that you need here: */
 #include <unistd.h>
@@ -28,6 +29,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ucontext.h>
 
 typedef uint rpthread_t;
 
@@ -39,7 +41,9 @@ typedef struct threadControlBlock {
 	// thread stack
 	// thread priority
 	// And more ...
-
+	ucontext_t *context;
+	rpthread_t tid;
+	void *stack;
 	// YOUR CODE HERE
 } tcb; 
 

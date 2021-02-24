@@ -8,7 +8,7 @@
 
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
-
+int threadCount = 0;
 
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, 
@@ -18,7 +18,15 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
        // allocate space of stack for this thread to run
        // after everything is all set, push this thread int
        // YOUR CODE HERE
-	
+	ucontext_t *threadCtx = malloc(sizeof(ucontext_t));
+	threadCtx->uc_link = NULL;
+	threadCtx->uc_stack.ss_sp = malloc(STK_SIZE);
+	threadCtx->uc_stack.ss_size = STK_SIZE;
+	threadCtx->uc_stack.ss_flags = 0;
+
+	tcb *newThread = malloc(sizeof(tcb));
+	newThread->tid = ++threadCount;
+	newThread->context = threadCtx;
     return 0;
 };
 
