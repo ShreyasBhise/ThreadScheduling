@@ -41,9 +41,8 @@ typedef struct threadControlBlock {
 	// thread stack
 	// thread priority
 	// And more ...
-	ucontext_t *context;
+	ucontext_t context;
 	rpthread_t tid;
-	void *stack;
 	// YOUR CODE HERE
 } tcb; 
 
@@ -58,7 +57,15 @@ typedef struct rpthread_mutex_t {
 // Feel free to add your own auxiliary data structures (linked list or queue etc...)
 
 // YOUR CODE HERE
+typedef struct node {
+	tcb *TCB;
+	node *next;
+} node;
 
+typedef struct queue {
+	node *front;
+	node *back;
+} queue;
 
 /* Function Declarations: */
 

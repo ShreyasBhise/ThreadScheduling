@@ -9,6 +9,46 @@
 // INITAILIZE ALL YOUR VARIABLES HERE
 // YOUR CODE HERE
 int threadCount = 0;
+int initialized = 0;
+int CURR_QUEUE = 0;
+int QUEUE_LEVELS = 1;
+int TIMER_ENABLED = 1;
+queue** queues;
+
+void add_front(queue* q, tcb* newTCB){
+	if(q->front==NULL){
+		q->front = (node*)malloc(sizeof(node));
+		q->front->next = NULL;
+		q->front->TCB=newTCB;
+		q->back=q->front;
+		return;
+	}
+	node* curr = q->front;
+	node* newNode = (node*)malloc(sizeof(node));
+	newNode->next = curr;
+	newNode->TCB = newTCB;
+	q->front = newNode;
+}
+
+void timer_interrupt(int signum) {
+	if(!TIMER_ENABLED) return;
+	if(signum==69) puts("yielded");
+	else puts("signum: %d", signum);
+	schedule();
+}
+
+void reset_timer() {
+	TIMER_ENABLED = 0;
+	struct itimerval timer;
+	timer.it_interval.tv_usec = 0;
+	timer.it_interval.tv_sec = 0;
+	timer.it_value.tv_usec = 0;
+	timer.it_value.tv_sec = 0;
+	setitimer(ITIMER_PROF, &timer, NULL);
+	timer.it_interval.tv_usec = TIMESLICE;
+	timer.it_value.tv_usec = TIMESLICE;
+	setitimer(ITIMER_PROF, &timer, NULL);
+}
 
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, 
@@ -18,26 +58,55 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
        // allocate space of stack for this thread to run
        // after everything is all set, push this thread int
        // YOUR CODE HERE
-	ucontext_t *threadCtx = malloc(sizeof(ucontext_t));
-	threadCtx->uc_link = NULL;
-	threadCtx->uc_stack.ss_sp = malloc(STK_SIZE);
-	threadCtx->uc_stack.ss_size = STK_SIZE;
-	threadCtx->uc_stack.ss_flags = 0;
-
-	tcb *newThread = malloc(sizeof(tcb));
+	TIMER_ENABLED = 0;
+    tcb* oldThread;
+    if(initialized==0){
+		oldThread = (tcb*)malloc(sizeof(tcb));
+		getcontext(&(oldThread->context));
+		// start scheduler
+		queues = malloc(QUEUE_LEVELS*sizeof(queue*));
+		int i;
+		for(i = 0; i<QUEUE_LEVELS; i++){
+			queues[i] = malloc(sizeof(queue));
+		}
+		add_front(queues[QUEUE_LEVELS-1], oldThread);
+		initialized = 1;
+		struct sigaction sa;
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = &timer_interrupt;
+		sigaction(SIGPROF, &sa, NULL);
+		struct itimerval timer;
+		timer.it_interval.tv_usec = TIMESLICE;
+		timer.it_interval.tv_sec = 0;
+		timer.it_value.tv_usec = TIMESLICE;
+		timer.it_value.tv_sec = 0;
+		setitimer(ITIMER_PROF, &timer, NULL);
+	} else {
+		oldThread = queues[CURR_QUEUE]->front->TCB;
+	}
+	tcb *newThread = (tcb*)malloc(sizeof(tcb));
+	getcontext(&(newThread->context));
+	newThread->context.uc_link = &(oldThread->context);
+	newThread->context.uc_stack.ss_sp = malloc(STK_SIZE);
+	newThread->context.uc_stack.ss_size = STK_SIZE;
+	newThread->context.uc_stack.ss_flags = 0;
+	makecontext(&newThread->context, function, arg);
 	newThread->tid = ++threadCount;
-	newThread->context = threadCtx;
+	add_front(queues[QUEUE_LEVELS-1], newThread);
+	setcontext(&newThread->context);
+	reset_timer();
+	TIMER_ENABLED = 1;
     return 0;
 };
 
 /* give CPU possession to other user-level threads voluntarily */
 int rpthread_yield() {
-	
 	// change thread state from Running to Ready
 	// save context of this thread to its thread control block
 	// wwitch from thread context to scheduler context
 
 	// YOUR CODE HERE
+	timer_interrupt(69);
 	return 0;
 };
 
