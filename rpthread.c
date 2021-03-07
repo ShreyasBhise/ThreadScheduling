@@ -13,7 +13,18 @@ int initialized = 0;
 int CURR_QUEUE = 0;
 int QUEUE_LEVELS = 1;
 int TIMER_ENABLED = 1;
+int EXIT = 0;
 queue** queues;
+struct itimerval timer;
+
+void print_queue(queue* q){
+	node* n = q->front;
+	while(n!=NULL){
+		printf("%d ", n->TCB->tid);
+		n = n->next;
+	}
+	return;
+}
 
 void add_front(queue* q, tcb* newTCB){
 	if(q->front==NULL){
@@ -28,26 +39,59 @@ void add_front(queue* q, tcb* newTCB){
 	newNode->next = curr;
 	newNode->TCB = newTCB;
 	q->front = newNode;
+	return;
+}
+
+node* pop(queue* q){
+	if(q->front==NULL) return NULL;
+	node* curr = q->front;
+	q->front = curr->next;
+	if(q->front==NULL){
+		q->back=NULL;
+	}
+	return curr;
+}
+
+void add_back(queue* q, node* newNode){
+	if(q->back==NULL){
+		q->front=newNode;
+		q->back=newNode;
+		return;
+	}
+	node* prev = q->back;
+	prev->next=newNode;
+	q->back = newNode;
+	newNode->next=NULL;
+	return;
 }
 
 void timer_interrupt(int signum) {
-	if(!TIMER_ENABLED) return;
+	EXIT=0;
+	if(TIMER_ENABLED==0) {
+		puts("bad access to timer");
+	}
+	TIMER_ENABLED=0;
 	if(signum==69) puts("yielded");
-	else puts("signum: %d", signum);
+	else if (signum==70){
+		puts("exiting thread");
+		EXIT=1;
+	}
+	//else puts("timer");
 	schedule();
 }
 
 void reset_timer() {
 	TIMER_ENABLED = 0;
-	struct itimerval timer;
-	timer.it_interval.tv_usec = 0;
-	timer.it_interval.tv_sec = 0;
 	timer.it_value.tv_usec = 0;
 	timer.it_value.tv_sec = 0;
 	setitimer(ITIMER_PROF, &timer, NULL);
-	timer.it_interval.tv_usec = TIMESLICE;
 	timer.it_value.tv_usec = TIMESLICE;
 	setitimer(ITIMER_PROF, &timer, NULL);
+}
+
+void run_thread(void *(*function)(void*), void * arg){
+	void * ret_val = function(arg);
+	rpthread_exit(ret_val);
 }
 
 /* create a new thread */
@@ -58,11 +102,16 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
        // allocate space of stack for this thread to run
        // after everything is all set, push this thread int
        // YOUR CODE HERE
+	int curr_thread = 0;
 	TIMER_ENABLED = 0;
     tcb* oldThread;
     if(initialized==0){
 		oldThread = (tcb*)malloc(sizeof(tcb));
 		getcontext(&(oldThread->context));
+		if(initialized) {
+			return curr_thread;
+		}
+		oldThread->tid=0;
 		// start scheduler
 		queues = malloc(QUEUE_LEVELS*sizeof(queue*));
 		int i;
@@ -75,14 +124,14 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = &timer_interrupt;
 		sigaction(SIGPROF, &sa, NULL);
-		struct itimerval timer;
-		timer.it_interval.tv_usec = TIMESLICE;
+		timer.it_interval.tv_usec = 0;
 		timer.it_interval.tv_sec = 0;
 		timer.it_value.tv_usec = TIMESLICE;
 		timer.it_value.tv_sec = 0;
 		setitimer(ITIMER_PROF, &timer, NULL);
 	} else {
 		oldThread = queues[CURR_QUEUE]->front->TCB;
+		printf("oldThread tid: %d\n", oldThread->tid);
 	}
 	tcb *newThread = (tcb*)malloc(sizeof(tcb));
 	getcontext(&(newThread->context));
@@ -90,13 +139,15 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	newThread->context.uc_stack.ss_sp = malloc(STK_SIZE);
 	newThread->context.uc_stack.ss_size = STK_SIZE;
 	newThread->context.uc_stack.ss_flags = 0;
-	makecontext(&newThread->context, function, arg);
+	makecontext(&newThread->context, run_thread, 2, function, arg);
 	newThread->tid = ++threadCount;
+	curr_thread = threadCount;
+	printf("%d\n", threadCount);
 	add_front(queues[QUEUE_LEVELS-1], newThread);
-	setcontext(&newThread->context);
 	reset_timer();
 	TIMER_ENABLED = 1;
-    return 0;
+	setcontext(&newThread->context);
+    return curr_thread;
 };
 
 /* give CPU possession to other user-level threads voluntarily */
@@ -115,6 +166,8 @@ void rpthread_exit(void *value_ptr) {
 	// Deallocated any dynamic memory created when starting this thread
 
 	// YOUR CODE HERE
+	timer_interrupt(70);
+	return;
 };
 
 
@@ -186,9 +239,11 @@ static void schedule() {
 #ifndef MLFQ
 	// Choose RR
      // CODE 1
+	sched_rr();
 #else 
 	// Choose MLFQ
      // CODE 2
+	 sched_mlfq();
 #endif
 
 }
@@ -197,7 +252,28 @@ static void schedule() {
 static void sched_rr() {
 	// Your own implementation of RR
 	// (feel free to modify arguments and return types)
-
+	// curr should exist, as yield cannot be called otherwise
+	//print_queue(queues[0]);
+	node* curr = pop(queues[0]);
+	//print_queue(queues[0]);
+	// Only thread in the queue
+	if(curr->next==NULL){
+		add_back(queues[0], curr);
+		reset_timer();
+		TIMER_ENABLED=1;
+		return;
+	}
+	// Setting next thread
+	node* next = curr->next;
+	//printf("EXIT=%d\n", EXIT);
+	if(EXIT==0) add_back(queues[0], curr);
+	curr->next=NULL;
+	//printf("O: %d, N: %d\n", curr->TCB->tid, next->TCB->tid);
+	//print_queue(queues[0]);
+	//printf("\n");
+	reset_timer();
+	TIMER_ENABLED=1;
+	swapcontext(&curr->TCB->context, &next->TCB->context);
 	// YOUR CODE HERE
 }
 

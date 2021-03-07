@@ -25,6 +25,7 @@ void parallel_calculate(void* arg) {
 	for (j = n; j < R_SIZE; j += thread_num) {
 		for (i = 0; i < C_SIZE; ++i) {
 			pSum[j] += a[j][i] * i;
+			//puts("test");
 		}
 	}
 	for (j = n; j < R_SIZE; j += thread_num) {
@@ -32,7 +33,7 @@ void parallel_calculate(void* arg) {
 		sum += pSum[j];
 		pthread_mutex_unlock(&mutex);
 	}
-
+	printf("%d", sum);
 	pthread_exit(NULL);
 }
 
@@ -88,31 +89,35 @@ int main(int argc, char **argv) {
 	memset(&pSum, 0, R_SIZE*sizeof(int));
 	// mutex init
 	pthread_mutex_init(&mutex, NULL);
-
+	puts("test");
 	struct timespec start, end;
         clock_gettime(CLOCK_REALTIME, &start);
-	for (i = 0; i < thread_num; ++i)
+	for (i = 0; i < thread_num; ++i){
+		puts("meow");
 		pthread_create(&thread[i], NULL, &parallel_calculate, &counter[i]);
+		puts("testinloop");
+	}
 
 	for (i = 0; i < thread_num; ++i)
 		pthread_join(thread[i], NULL);
-
+	puts("test");
 	clock_gettime(CLOCK_REALTIME, &end);
         printf("running time: %lu micro-seconds\n", 
 	       (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
 
 	printf("sum is: %d\n", sum);
+	/*
 	// mutex destroy
 	pthread_mutex_destroy(&mutex);
-
+	*/
 	// feel free to verify your answer here:
-	verify();
+	verify();/*
 	// Free memory on Heap
 	free(thread);
 	free(counter);
 	
 	for (i = 0; i < R_SIZE; ++i)
 		free(a[i]);
-
+	*/
 	return 0;
 }

@@ -21,15 +21,19 @@
 #define READY 0
 #define SCHEDULED 1
 #define BLOCKED 2
-#define STK_SIZE SIGSTKSZ
 
 /* include lib header files that you need here: */
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
+#include <signal.h>
+#include <string.h>
+
+#define STK_SIZE SIGSTKSZ
 
 typedef uint rpthread_t;
 
@@ -43,6 +47,7 @@ typedef struct threadControlBlock {
 	// And more ...
 	ucontext_t context;
 	rpthread_t tid;
+	int status;
 	// YOUR CODE HERE
 } tcb; 
 
@@ -59,7 +64,7 @@ typedef struct rpthread_mutex_t {
 // YOUR CODE HERE
 typedef struct node {
 	tcb *TCB;
-	node *next;
+	struct node *next;
 } node;
 
 typedef struct queue {
@@ -68,6 +73,12 @@ typedef struct queue {
 } queue;
 
 /* Function Declarations: */
+
+void add_front(queue* q, tcb* newTCB);
+
+void timer_interrupt(int signum);
+
+void reset_timer();
 
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, void
@@ -94,6 +105,11 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex);
 
 /* destroy the mutex */
 int rpthread_mutex_destroy(rpthread_mutex_t *mutex);
+
+static void schedule();
+static void sched_rr();
+static void sched_mlfq();
+
 
 #ifdef USE_RTHREAD
 #define pthread_t rpthread_t
