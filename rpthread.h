@@ -21,7 +21,7 @@
 #define READY 0
 #define SCHEDULED 1
 #define BLOCKED 2
-
+#define RUNNING 3
 /* include lib header files that you need here: */
 #include <unistd.h>
 #include <sys/syscall.h>

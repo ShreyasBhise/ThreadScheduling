@@ -1,8 +1,8 @@
 // File:	rpthread.c
 
-// List all group member's name:
-// username of iLab:
-// iLab Server:
+// List all group member's name: Shreyas Bhise, Ryan Jensen
+// username of iLab: syb29
+// iLab Server: kill.cs.rutgers.edu
 
 #include "rpthread.h"
 
@@ -152,6 +152,8 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 
 /* give CPU possession to other user-level threads voluntarily */
 int rpthread_yield() {
+	tcb* curr = queues[QUEUE_LEVELS-1]->front->TCB;
+	curr->status = READY;
 	// change thread state from Running to Ready
 	// save context of this thread to its thread control block
 	// wwitch from thread context to scheduler context
@@ -176,7 +178,13 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	
 	// wait for a specific thread to terminate
 	// de-allocate any dynamic memory created by the joining thread
-  
+  	//Check if thread is not the same as current thread
+	node* curr = queues[CURR_QUEUE]->front;
+	if(thread == curr->tid)
+		return -1;
+	
+	curr->status = BLOCKED;
+	
 	// YOUR CODE HERE
 	return 0;
 };
