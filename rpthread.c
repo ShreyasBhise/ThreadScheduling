@@ -15,6 +15,7 @@ int QUEUE_LEVELS = 1;
 int TIMER_ENABLED = 1;
 int EXIT = 0;
 queue** queues;
+queue* blocked;
 struct itimerval timer;
 
 void print_queue(queue* q){
@@ -141,6 +142,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	newThread->context.uc_stack.ss_flags = 0;
 	makecontext(&newThread->context, run_thread, 2, function, arg);
 	newThread->tid = ++threadCount;
+	newThread->parent = 0;
 	curr_thread = threadCount;
 	printf("%d\n", threadCount);
 	add_front(queues[QUEUE_LEVELS-1], newThread);
@@ -156,7 +158,7 @@ int rpthread_yield() {
 	curr->status = READY;
 	// change thread state from Running to Ready
 	// save context of this thread to its thread control block
-	// wwitch from thread context to scheduler context
+	// switch from thread context to scheduler context
 
 	// YOUR CODE HERE
 	timer_interrupt(69);
@@ -166,7 +168,20 @@ int rpthread_yield() {
 /* terminate a thread */
 void rpthread_exit(void *value_ptr) {
 	// Deallocated any dynamic memory created when starting this thread
+	node* curr = queues[CURR_QUEUE]->front;
+	tcb* thread = curr->TCB;
 
+	if(thread->parent != 0) {
+		//Search blocked for this tid;
+		node* temp;
+		int flag = 1;
+		for(temp = blocked->front; temp != NULL && flag; temp = temp->next) {
+			if(temp->TCB->tid == thread->parent) {
+				temp->TCB->status = READY;
+				flag = 0;
+			}
+		}
+	}
 	// YOUR CODE HERE
 	timer_interrupt(70);
 	return;
@@ -179,12 +194,31 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	// wait for a specific thread to terminate
 	// de-allocate any dynamic memory created by the joining thread
   	//Check if thread is not the same as current thread
-	node* curr = queues[CURR_QUEUE]->front;
+	tcb* curr = queues[CURR_QUEUE]->front->TCB;
 	if(thread == curr->tid)
 		return -1;
+	int i;
 	
+	// Find the 
+	for(i = 0; i < QUEUE_LEVELS; i++) {
+		int flag = 0;
+		queue* temp = queues[i];
+		node* t;
+		for(t = temp->front; t != NULL; t = t->next) {
+			if(t->TCB->tid == thread) {
+				t->TCB->parent = curr->tid;
+				flag = 1;
+				break;
+			}
+		}
+		if(flag) {
+			break;
+		}
+	}
 	curr->status = BLOCKED;
 	
+	add_front(blocked, curr);
+	printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
 	// YOUR CODE HERE
 	return 0;
 };

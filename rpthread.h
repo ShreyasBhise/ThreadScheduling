@@ -47,6 +47,7 @@ typedef struct threadControlBlock {
 	// And more ...
 	ucontext_t context;
 	rpthread_t tid;
+	rpthread_t parent;
 	int status;
 	// YOUR CODE HERE
 } tcb; 
@@ -79,6 +80,10 @@ void add_front(queue* q, tcb* newTCB);
 void timer_interrupt(int signum);
 
 void reset_timer();
+
+void add_back(queue* q, node* newNode);
+
+node* pop(queue* q);
 
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, void
