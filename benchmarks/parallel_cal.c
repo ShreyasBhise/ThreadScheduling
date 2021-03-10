@@ -33,7 +33,7 @@ void parallel_calculate(void* arg) {
 		sum += pSum[j];
 		pthread_mutex_unlock(&mutex);
 	}
-	printf("%d", sum);
+	printf("sum for thread: %d\n", sum);
 	pthread_exit(NULL);
 }
 
@@ -98,26 +98,26 @@ int main(int argc, char **argv) {
 		puts("testinloop");
 	}
 
-	for (i = 0; i < thread_num; ++i)
-		pthread_join(thread[i], NULL);
+	//for (i = 0; i < thread_num; ++i)
+	//	pthread_join(thread[i], NULL);
 	puts("test");
 	clock_gettime(CLOCK_REALTIME, &end);
         printf("running time: %lu micro-seconds\n", 
 	       (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
 
 	printf("sum is: %d\n", sum);
-	/*
+	
 	// mutex destroy
 	pthread_mutex_destroy(&mutex);
-	*/
+	
 	// feel free to verify your answer here:
-	verify();/*
+	verify();
 	// Free memory on Heap
 	free(thread);
 	free(counter);
 	
 	for (i = 0; i < R_SIZE; ++i)
 		free(a[i]);
-	*/
+	
 	return 0;
 }

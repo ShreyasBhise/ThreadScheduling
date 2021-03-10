@@ -15,7 +15,7 @@
 #ifndef TIMESLICE
 /* defined timeslice to 5 ms, feel free to change this while testing your code
  * it can be done directly in the Makefile*/
-#define TIMESLICE 5
+#define TIMESLICE 15
 #endif
 
 #define READY 0
@@ -84,6 +84,12 @@ void reset_timer();
 void add_back(queue* q, node* newNode);
 
 node* pop(queue* q);
+
+node* findThreadInQueue(queue* q, rpthread_t);
+
+node* findActiveThread(rpthread_t tid);
+
+node* findBlockedThread(rpthread_t tid);
 
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, void

@@ -72,12 +72,12 @@ void timer_interrupt(int signum) {
 		puts("bad access to timer");
 	}
 	TIMER_ENABLED=0;
-	if(signum==69) puts("yielded");
+	if(signum==69)  puts("yielded");
 	else if (signum==70){
 		puts("exiting thread");
 		EXIT=1;
 	}
-	//else puts("timer");
+	else return;
 	schedule();
 }
 
@@ -94,7 +94,29 @@ void run_thread(void *(*function)(void*), void * arg){
 	void * ret_val = function(arg);
 	rpthread_exit(ret_val);
 }
+node* findThreadInQueue(queue* q, rpthread_t tid) {
+	node* temp;
+	for(temp = q->front; temp != NULL; temp = temp -> next) {
+		if(temp->TCB->tid == tid) {
+			return temp;
+		}
+	}
+	return NULL;
+}
 
+node* findActiveThread(rpthread_t tid) {
+	int i;
+	for(i = 0; i < QUEUE_LEVELS; i++) {
+		node* found = findThreadInQueue(queues[i], tid);
+		if(found != NULL) return found;
+	}
+	//Thread not found
+	return NULL;
+}
+
+node* findBlockedThread(rpthread_t tid) {
+	return findThreadInQueue(blocked, tid);
+}
 /* create a new thread */
 int rpthread_create(rpthread_t * thread, pthread_attr_t * attr, 
                       void *(*function)(void*), void * arg) {
@@ -144,7 +166,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	newThread->tid = ++threadCount;
 	newThread->parent = 0;
 	curr_thread = threadCount;
-	printf("%d\n", threadCount);
+	printf("numThreads: %d\n creating thread %u\n", threadCount, newThread->tid);
 	add_front(queues[QUEUE_LEVELS-1], newThread);
 	reset_timer();
 	TIMER_ENABLED = 1;
@@ -173,14 +195,10 @@ void rpthread_exit(void *value_ptr) {
 
 	if(thread->parent != 0) {
 		//Search blocked for this tid;
-		node* temp;
-		int flag = 1;
-		for(temp = blocked->front; temp != NULL && flag; temp = temp->next) {
-			if(temp->TCB->tid == thread->parent) {
-				temp->TCB->status = READY;
-				flag = 0;
-			}
-		}
+		printf("thread %u is now ready\n", thread->parent);
+		node* temp = findBlockedThread(thread->parent);
+		temp->TCB->status = READY;
+
 	}
 	// YOUR CODE HERE
 	timer_interrupt(70);
@@ -199,24 +217,12 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 		return -1;
 	int i;
 	
-	// Find the 
-	for(i = 0; i < QUEUE_LEVELS; i++) {
-		int flag = 0;
-		queue* temp = queues[i];
-		node* t;
-		for(t = temp->front; t != NULL; t = t->next) {
-			if(t->TCB->tid == thread) {
-				t->TCB->parent = curr->tid;
-				flag = 1;
-				break;
-			}
-		}
-		if(flag) {
-			break;
-		}
-	}
-	curr->status = BLOCKED;
+	node* waitFor = findActiveThread(thread);
+	if(waitFor == NULL) //Waiting for a thread that has already terminated
+		return -1;
 	
+	curr->status = BLOCKED;
+	waitFor->TCB->parent = curr->tid;
 	add_front(blocked, curr);
 	printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
 	// YOUR CODE HERE
