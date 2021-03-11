@@ -19,13 +19,17 @@ int res = 0;
 void vector_multiply(void* arg) {
 	int i = 0;
 	int n = *((int*) arg);
-	
+	puts("start");
 	for (i = n; i < VECTOR_SIZE; i += thread_num) {
-		pthread_mutex_lock(&mutex);
+		pthread_mutex_lock(&mutex); 
+		puts("locked");
+		printf("%d\n", i % thread_num);
 		res += r[i] * s[i];
-		pthread_mutex_unlock(&mutex);	
+		puts("unlocked");
+		pthread_mutex_unlock(&mutex);
+			
 	}
-
+	puts("end");
 	pthread_exit(NULL);
 }
 

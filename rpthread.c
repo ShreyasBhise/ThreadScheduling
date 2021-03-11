@@ -14,6 +14,7 @@ int CURR_QUEUE = 0;
 int QUEUE_LEVELS = 1;
 int TIMER_ENABLED = 1;
 int EXIT = 0;
+int YIELD = 0;
 queue** queues;
 queue* blocked;
 queue* finished;
@@ -69,18 +70,22 @@ void add_back(queue* q, node* newNode){
 }
 
 void timer_interrupt(int signum) {
-	EXIT=0;
+	EXIT=0; 
+	YIELD = 0;
 	if(TIMER_ENABLED==0) {
 		puts("bad access to timer");
 	}
 	TIMER_ENABLED=0;
-	if(signum==69)  puts("yielded");
+	if(signum==69)  {
+		puts("yielded");
+		YIELD = 1;
+	}
 	else if (signum==70){
 		puts("exiting thread");
 		EXIT=1;
 	} else if (signum==71){
-		puts("joined thread");
-	}
+		//puts("joined thread");
+	} 
 	//else return;
 	schedule();
 }
@@ -161,7 +166,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		setitimer(ITIMER_PROF, &timer, NULL);
 	} else {
 		oldThread = queues[CURR_QUEUE]->front->TCB;
-		printf("oldThread tid: %d\n", oldThread->tid);
+		//printf("oldThread tid: %d\n", oldThread->tid);
 	}
 	tcb *newThread = (tcb*)malloc(sizeof(tcb));
 	getcontext(&(newThread->context));
@@ -174,7 +179,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	*thread = newThread->tid;
 	newThread->parent = INT_MAX;
 	curr_thread = threadCount;
-	printf("numThreads: %d\n creating thread %u\n", threadCount, newThread->tid);
+	//printf("numThreads: %d\n creating thread %u\n", threadCount, newThread->tid);
 	add_front(queues[QUEUE_LEVELS-1], newThread);
 	reset_timer();
 	TIMER_ENABLED = 1;
@@ -204,7 +209,7 @@ void rpthread_exit(void *value_ptr) {
 	thread->value = value_ptr;
 	if(thread->parent != INT_MAX) {
 		//Search blocked for this tid;
-		printf("thread %u is now ready\n", thread->parent);
+		//printf("thread %u is now ready\n", thread->parent);
 		node* temp = findBlockedThread(thread->parent);
 		temp->TCB->status = READY;
 	}
@@ -241,7 +246,7 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	waitFor->TCB->parent = curr->tid;
 	add_front(blocked, curr);
 	curr->status=BLOCKED;
-	printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
+//	printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
 	timer_interrupt(71);
 	if(value_ptr==NULL) return 0;
 	node* temp = finished->front;
@@ -258,8 +263,12 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 int rpthread_mutex_init(rpthread_mutex_t *mutex, 
                           const pthread_mutexattr_t *mutexattr) {
 	//initialize data structures for this mutex
+	rpthread_mutex_t m = *mutex;
+	m.lock = 0;
+	m.currThread = INT_MAX;
+	m.blocked = malloc(sizeof(queue)); 
 
-	// YOUR CODE HERE
+	*mutex = m;
 	return 0;
 };
 
@@ -269,8 +278,14 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
         // if the mutex is acquired successfully, enter the critical section
         // if acquiring mutex fails, push current thread into block list and //  
         // context switch to the scheduler thread
-
-        // YOUR CODE HERE
+		while(__sync_lock_test_and_set(&(mutex->lock), 1)) {
+			node* curr = queues[CURR_QUEUE]->front;
+			add_back(mutex->blocked, curr);
+			curr->TCB->status = BLOCKED;
+			mutex->currThread = curr->TCB->tid;
+			timer_interrupt(71);
+		}
+		printf("end of lock:%d\n", mutex->lock);
         return 0;
 };
 
@@ -279,8 +294,20 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 	// Release mutex and make it available again. 
 	// Put threads in block list to run queue 
 	// so that they could compete for mutex later.
+	printf("Queue: ");
+	print_queue(mutex->blocked);
+	puts("");
+	mutex->currThread = INT_MAX;
 
-	// YOUR CODE HERE
+	node* bThread = pop(mutex->blocked);
+	while(bThread != NULL) {
+		printf("unblocking thread %u", bThread->TCB->tid);
+		bThread->TCB->status = READY;
+		bThread = pop(mutex->blocked);
+	}
+	
+	__sync_lock_release(&(mutex->lock));
+	printf("end of unlock:%d\n", mutex->lock);
 	return 0;
 };
 

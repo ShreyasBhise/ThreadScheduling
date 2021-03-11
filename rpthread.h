@@ -22,6 +22,7 @@
 #define SCHEDULED 1
 #define BLOCKED 2
 #define RUNNING 3
+
 /* include lib header files that you need here: */
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -54,17 +55,6 @@ typedef struct threadControlBlock {
 	// YOUR CODE HERE
 } tcb; 
 
-/* mutex struct definition */
-typedef struct rpthread_mutex_t {
-	/* add something here */
-
-	// YOUR CODE HERE
-} rpthread_mutex_t;
-
-/* define your data structures here: */
-// Feel free to add your own auxiliary data structures (linked list or queue etc...)
-
-// YOUR CODE HERE
 typedef struct node {
 	tcb *TCB;
 	struct node *next;
@@ -74,6 +64,22 @@ typedef struct queue {
 	node *front;
 	node *back;
 } queue;
+
+/* mutex struct definition */
+typedef struct rpthread_mutex_t {
+	/* add something here */
+	volatile int lock;
+	rpthread_t currThread;
+	queue* blocked;
+	// YOUR CODE HERE
+} rpthread_mutex_t;
+
+/* define your data structures here: */
+// Feel free to add your own auxiliary data structures (linked list or queue etc...)
+
+// YOUR CODE HERE
+
+
 
 /* Function Declarations: */
 
