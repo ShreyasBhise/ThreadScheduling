@@ -32,6 +32,7 @@
 #include <ucontext.h>
 #include <signal.h>
 #include <string.h>
+#include <limits.h>
 
 #define STK_SIZE SIGSTKSZ
 
@@ -49,6 +50,7 @@ typedef struct threadControlBlock {
 	rpthread_t tid;
 	rpthread_t parent;
 	int status;
+	void* value;
 	// YOUR CODE HERE
 } tcb; 
 

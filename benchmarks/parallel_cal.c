@@ -89,18 +89,17 @@ int main(int argc, char **argv) {
 	memset(&pSum, 0, R_SIZE*sizeof(int));
 	// mutex init
 	pthread_mutex_init(&mutex, NULL);
-	puts("test");
 	struct timespec start, end;
         clock_gettime(CLOCK_REALTIME, &start);
 	for (i = 0; i < thread_num; ++i){
-		puts("meow");
 		pthread_create(&thread[i], NULL, &parallel_calculate, &counter[i]);
 		puts("testinloop");
 	}
 
-	//for (i = 0; i < thread_num; ++i)
-	//	pthread_join(thread[i], NULL);
-	puts("test");
+	for (i = 0; i < thread_num; ++i) {
+		printf("joining thread %d\n", thread[i]);
+		pthread_join(thread[i], NULL);
+	}
 	clock_gettime(CLOCK_REALTIME, &end);
         printf("running time: %lu micro-seconds\n", 
 	       (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
