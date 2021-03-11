@@ -25,7 +25,6 @@ void parallel_calculate(void* arg) {
 	for (j = n; j < R_SIZE; j += thread_num) {
 		for (i = 0; i < C_SIZE; ++i) {
 			pSum[j] += a[j][i] * i;
-			//puts("test");
 		}
 	}
 	for (j = n; j < R_SIZE; j += thread_num) {
@@ -33,7 +32,6 @@ void parallel_calculate(void* arg) {
 		sum += pSum[j];
 		pthread_mutex_unlock(&mutex);
 	}
-	printf("sum for thread: %d\n", sum);
 	pthread_exit(NULL);
 }
 
@@ -53,7 +51,7 @@ void verify() {
 	for (j = 0; j < R_SIZE; j += 1) {
 		sum += pSum[j];
 	}
-	printf("verified sum is: %d\n", sum);
+	printf("%d\n", sum);
 }
 
 int main(int argc, char **argv) {
@@ -93,18 +91,16 @@ int main(int argc, char **argv) {
         clock_gettime(CLOCK_REALTIME, &start);
 	for (i = 0; i < thread_num; ++i){
 		pthread_create(&thread[i], NULL, &parallel_calculate, &counter[i]);
-		puts("testinloop");
 	}
 
 	for (i = 0; i < thread_num; ++i) {
-		printf("joining thread %d\n", thread[i]);
 		pthread_join(thread[i], NULL);
 	}
 	clock_gettime(CLOCK_REALTIME, &end);
-        printf("running time: %lu micro-seconds\n", 
+        printf("%lu ", 
 	       (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
 
-	printf("sum is: %d\n", sum);
+	printf("%d ", sum);
 	
 	// mutex destroy
 	pthread_mutex_destroy(&mutex);

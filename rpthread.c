@@ -12,11 +12,10 @@ int threadCount = 0;
 int initialized = 0;
 int CURR_QUEUE = 0;
 
-int QUEUE_LEVELS;
 #ifndef MLFQ
-	QUEUE_LEVELS = 1;
+	#define QUEUE_LEVELS 1
 #else
-	QUEUE_LEVELS = 4;
+	#define QUEUE_LEVELS 4
 #endif
 
 int TIMER_ENABLED = 1;
@@ -80,21 +79,13 @@ void add_back(queue* q, node* newNode){
 void timer_interrupt(int signum) {
 	EXIT=0; 
 	YIELD = 0;
-	if(TIMER_ENABLED==0) {
-		puts("bad access to timer");
-	}
 	TIMER_ENABLED=0;
 	if(signum==69)  {
-		puts("yielded");
 		YIELD = 1;
 	}
 	else if (signum==70){
-		puts("exiting thread");
 		EXIT=1;
-	} else if (signum==71){
-		//puts("joined thread");
-	} 
-	//else return;
+	}
 	schedule();
 }
 
@@ -141,7 +132,6 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
        // create and initialize the context of this thread
        // allocate space of stack for this thread to run
        // after everything is all set, push this thread int
-       // YOUR CODE HERE
 	int curr_thread = 0;
 	TIMER_ENABLED = 0;
     tcb* oldThread;
@@ -174,7 +164,6 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		setitimer(ITIMER_PROF, &timer, NULL);
 	} else {
 		oldThread = queues[CURR_QUEUE]->front->TCB;
-		//printf("oldThread tid: %d\n", oldThread->tid);
 	}
 	tcb *newThread = (tcb*)malloc(sizeof(tcb));
 	getcontext(&(newThread->context));
@@ -187,7 +176,6 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	*thread = newThread->tid;
 	newThread->parent = INT_MAX;
 	curr_thread = threadCount;
-	//printf("numThreads: %d\n creating thread %u\n", threadCount, newThread->tid);
 	add_front(queues[0], newThread);
 	reset_timer();
 	TIMER_ENABLED = 1;
@@ -202,8 +190,6 @@ int rpthread_yield() {
 	// change thread state from Running to Ready
 	// save context of this thread to its thread control block
 	// switch from thread context to scheduler context
-
-	// YOUR CODE HERE
 	timer_interrupt(69);
 	return 0;
 };
@@ -217,7 +203,6 @@ void rpthread_exit(void *value_ptr) {
 	thread->value = value_ptr;
 	if(thread->parent != INT_MAX) {
 		//Search blocked for this tid;
-		//printf("thread %u is now ready\n", thread->parent);
 		node* temp = findBlockedThread(thread->parent);
 		temp->TCB->status = READY;
 	}
@@ -234,7 +219,6 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	// de-allocate any dynamic memory created by the joining thread
   	//Check if thread is not the same as current thread
 	tcb* curr = queues[CURR_QUEUE]->front->TCB;
-	//printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
 	if(thread == curr->tid)
 		return -1;
 	int i;
@@ -254,7 +238,6 @@ int rpthread_join(rpthread_t thread, void **value_ptr) {
 	waitFor->TCB->parent = curr->tid;
 	add_front(blocked, curr);
 	curr->status=BLOCKED;
-//	printf("Thread %d stopped until thread %d terminates\n", curr->tid, thread);
 	timer_interrupt(71);
 	if(value_ptr==NULL) return 0;
 	node* temp = finished->front;
@@ -296,7 +279,6 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
 			timer_interrupt(71);
 		}
 		mutex->currThread = queues[CURR_QUEUE]->front->TCB->tid;
-		//printf("end of lock:%d\n", mutex->lock);
         return 0;
 };
 
@@ -310,14 +292,12 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 
 	node* bThread = pop(mutex->blocked);
 	while(bThread != NULL) {
-		//printf("unblocking thread %u", bThread->TCB->tid);
 		bThread->TCB->status = READY;
 		free(bThread);
 		bThread = pop(mutex->blocked);
 	}
 	
 	__sync_lock_release(&(mutex->lock));
-	//printf("end of unlock:%d\n", mutex->lock);
 	return 0;
 };
 
@@ -398,22 +378,7 @@ static void sched_rr() {
 
 /* Preemptive MLFQ scheduling algorithm */
 static void sched_mlfq() {
-	CURR_QUEUE = 0;
 	node* curr = pop(queues[CURR_QUEUE]);
-	// Find first non-empty queue
-	while(curr == NULL && CURR_QUEUE < QUEUE_LEVELS ) {
-		curr = pop(queues[++CURR_QUEUE]);
-		printf("next queue\n");
-	}
-
-	// Only thread in queue.
-	if(curr->next==NULL){
-		add_back(queues[CURR_QUEUE], curr);
-		reset_timer();
-		TIMER_ENABLED=1;
-		return;
-	}
-	node* nxt = curr->next;
 	if(YIELD==1 && EXIT == 0) 
 		add_back(queues[CURR_QUEUE], curr);
 	else if(EXIT == 0) {
@@ -423,6 +388,21 @@ static void sched_mlfq() {
 			add_back(queues[CURR_QUEUE + 1], curr);
 	}
 	curr->next=NULL;
+	node* temp = NULL;
+	for(int i = 0; i<QUEUE_LEVELS; i++){
+		temp = queues[i]->front;
+		while(temp!=NULL && temp->TCB->status==BLOCKED){
+			temp = temp->next;
+		}
+		if(temp!=NULL){
+			CURR_QUEUE = i;
+			break;
+		}
+	}
+	if(temp==NULL){
+		puts("Error: all threads blocked");
+	}
+	node* nxt = queues[CURR_QUEUE]->front;
 	while(nxt->TCB->status==BLOCKED){
 		// put nxt to the back and try the next node
 		node* temp = pop(queues[CURR_QUEUE]);
@@ -436,7 +416,6 @@ static void sched_mlfq() {
 		return;
 	}
 	reset_timer();
-	if(CURR_QUEUE == 3) CURR_QUEUE = 0;
 	TIMER_ENABLED=1;
 	swapcontext(&curr->TCB->context, &nxt->TCB->context);
 }
