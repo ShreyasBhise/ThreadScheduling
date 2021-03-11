@@ -280,12 +280,15 @@ int rpthread_mutex_lock(rpthread_mutex_t *mutex) {
         // context switch to the scheduler thread
 		while(__sync_lock_test_and_set(&(mutex->lock), 1)) {
 			node* curr = queues[CURR_QUEUE]->front;
-			add_back(mutex->blocked, curr);
-			curr->TCB->status = BLOCKED;
-			mutex->currThread = curr->TCB->tid;
+			node* newMutexNode = malloc(sizeof(node));
+			newMutexNode->TCB=curr->TCB;
+			newMutexNode->next=NULL;
+			add_back(mutex->blocked, newMutexNode);
+			newMutexNode->TCB->status = BLOCKED;
 			timer_interrupt(71);
 		}
-		printf("end of lock:%d\n", mutex->lock);
+		mutex->currThread = queues[CURR_QUEUE]->front->TCB->tid;
+		//printf("end of lock:%d\n", mutex->lock);
         return 0;
 };
 
@@ -294,20 +297,21 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 	// Release mutex and make it available again. 
 	// Put threads in block list to run queue 
 	// so that they could compete for mutex later.
-	printf("Queue: ");
-	print_queue(mutex->blocked);
-	puts("");
+	//printf("Queue: ");
+	//print_queue(mutex->blocked);
+	//puts("");
 	mutex->currThread = INT_MAX;
 
 	node* bThread = pop(mutex->blocked);
 	while(bThread != NULL) {
-		printf("unblocking thread %u", bThread->TCB->tid);
+		//printf("unblocking thread %u", bThread->TCB->tid);
 		bThread->TCB->status = READY;
+		free(bThread);
 		bThread = pop(mutex->blocked);
 	}
 	
 	__sync_lock_release(&(mutex->lock));
-	printf("end of unlock:%d\n", mutex->lock);
+	//printf("end of unlock:%d\n", mutex->lock);
 	return 0;
 };
 
@@ -315,7 +319,12 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 /* destroy the mutex */
 int rpthread_mutex_destroy(rpthread_mutex_t *mutex) {
 	// Deallocate dynamic memory created in rpthread_mutex_init
-
+	node* curr = pop(mutex->blocked);
+	while(curr!=NULL){
+		free(curr);
+		curr = pop(mutex->blocked);
+	}
+	free(mutex->blocked);
 	return 0;
 };
 
