@@ -11,7 +11,14 @@
 int threadCount = 0;
 int initialized = 0;
 int CURR_QUEUE = 0;
-int QUEUE_LEVELS = 1;
+
+int QUEUE_LEVELS;
+#ifndef MLFQ
+	QUEUE_LEVELS = 1;
+#else
+	QUEUE_LEVELS = 4;
+#endif
+
 int TIMER_ENABLED = 1;
 int EXIT = 0;
 int YIELD = 0;
@@ -26,6 +33,7 @@ void print_queue(queue* q){
 		printf("%d ", n->TCB->tid);
 		n = n->next;
 	}
+	puts("");
 	return;
 }
 
@@ -153,7 +161,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 		}
 		blocked = malloc(sizeof(queue));
 		finished = malloc(sizeof(queue));
-		add_front(queues[QUEUE_LEVELS-1], oldThread);
+		add_front(queues[0], oldThread);
 		initialized = 1;
 		struct sigaction sa;
 		memset(&sa, 0, sizeof(sa));
@@ -297,9 +305,7 @@ int rpthread_mutex_unlock(rpthread_mutex_t *mutex) {
 	// Release mutex and make it available again. 
 	// Put threads in block list to run queue 
 	// so that they could compete for mutex later.
-	//printf("Queue: ");
-	//print_queue(mutex->blocked);
-	//puts("");
+	
 	mutex->currThread = INT_MAX;
 
 	node* bThread = pop(mutex->blocked);
@@ -359,12 +365,9 @@ static void schedule() {
 
 /* Round Robin (RR) scheduling algorithm */
 static void sched_rr() {
-	// Your own implementation of RR
-	// (feel free to modify arguments and return types)
 	// curr should exist, as yield cannot be called otherwise
-	//print_queue(queues[0]);
 	node* curr = pop(queues[0]);
-	//print_queue(queues[0]);
+
 	// Only thread in the queue
 	if(curr->next==NULL){
 		add_back(queues[0], curr);
@@ -373,7 +376,6 @@ static void sched_rr() {
 		return;
 	}
 	node* nxt = curr->next;
-	//printf("EXIT=%d\n", EXIT);
 	if(EXIT==0) add_back(queues[0], curr);
 	curr->next=NULL;
 	//finding next thread to run
@@ -384,32 +386,57 @@ static void sched_rr() {
 		add_back(queues[0], temp);
 		temp->next=NULL;
 	} 
-	//printf("O: %d, N: %d\n", curr->TCB->tid, next->TCB->tid);
-	//print_queue(queues[0]);
-	//printf("\n");
 	if(curr->TCB->tid==nxt->TCB->tid){ // everything else blocked, resume current
-		//puts("self-switch");
 		reset_timer();
 		TIMER_ENABLED=1;
 		return;
 	}
-	//printf("%d switch to %d\n", curr->TCB->tid, nxt->TCB->tid);
-	//printf("%d\n", curr->TCB->status);
 	reset_timer();
 	TIMER_ENABLED=1;
 	swapcontext(&curr->TCB->context, &nxt->TCB->context);
-	// YOUR CODE HERE
 }
 
 /* Preemptive MLFQ scheduling algorithm */
 static void sched_mlfq() {
-	// Your own implementation of MLFQ
-	// (feel free to modify arguments and return types)
+	node* curr = pop(queues[CURR_QUEUE]);
+	print_queue(queues[CURR_QUEUE]);
+	// Find first non-empty queue
+	while(curr == NULL && CURR_QUEUE < QUEUE_LEVELS ) {
+		curr = pop(queues[++CURR_QUEUE]);
+		printf("next queue\n");
+	}
 
-	// YOUR CODE HERE
+	// Only thread in queue.
+	if(curr->next==NULL){
+		add_back(queues[CURR_QUEUE], curr);
+		reset_timer();
+		TIMER_ENABLED=1;
+		return;
+	}
+	node* nxt = curr->next;
+	if(YIELD==1 && EXIT == 0) 
+		add_back(queues[CURR_QUEUE], curr);
+	else if(EXIT == 0) {
+		if(CURR_QUEUE + 1 == QUEUE_LEVELS) 
+			add_back(queues[CURR_QUEUE], curr);
+		else
+			add_back(queues[CURR_QUEUE + 1], curr);
+	}
+	curr->next=NULL;
+	while(nxt->TCB->status==BLOCKED){
+		// put nxt to the back and try the next node
+		node* temp = pop(queues[CURR_QUEUE]);
+		nxt=temp->next;
+		add_back(queues[CURR_QUEUE], temp);
+		temp->next=NULL;
+	} 
+	if(curr->TCB->tid==nxt->TCB->tid){ // everything else blocked, resume current
+		reset_timer();
+		TIMER_ENABLED=1;
+		return;
+	}
+	reset_timer();
+	if(CURR_QUEUE == 3) CURR_QUEUE = 0;
+	TIMER_ENABLED=1;
+	swapcontext(&curr->TCB->context, &nxt->TCB->context);
 }
-
-// Feel free to add any other functions you need
-
-// YOUR CODE HERE
-

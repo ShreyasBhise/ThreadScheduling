@@ -3,8 +3,8 @@ CFLAGS = -g -c
 AR = ar -rc
 RANLIB = ranlib
 
-SCHED = RR
-TSLICE= 15 ##timeslice variable
+SCHED = MLFQ
+TSLICE= 45 ##timeslice variable
 
 all: rpthread.a
 
