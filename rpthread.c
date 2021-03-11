@@ -188,7 +188,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 	newThread->parent = INT_MAX;
 	curr_thread = threadCount;
 	//printf("numThreads: %d\n creating thread %u\n", threadCount, newThread->tid);
-	add_front(queues[QUEUE_LEVELS-1], newThread);
+	add_front(queues[0], newThread);
 	reset_timer();
 	TIMER_ENABLED = 1;
 	setcontext(&newThread->context);
@@ -197,7 +197,7 @@ int rpthread_create(rpthread_t * thread, pthread_attr_t * attr,
 
 /* give CPU possession to other user-level threads voluntarily */
 int rpthread_yield() {
-	tcb* curr = queues[QUEUE_LEVELS-1]->front->TCB;
+	tcb* curr = queues[CURR_QUEUE]->front->TCB;
 	curr->status = READY;
 	// change thread state from Running to Ready
 	// save context of this thread to its thread control block
@@ -398,8 +398,8 @@ static void sched_rr() {
 
 /* Preemptive MLFQ scheduling algorithm */
 static void sched_mlfq() {
+	CURR_QUEUE = 0;
 	node* curr = pop(queues[CURR_QUEUE]);
-	print_queue(queues[CURR_QUEUE]);
 	// Find first non-empty queue
 	while(curr == NULL && CURR_QUEUE < QUEUE_LEVELS ) {
 		curr = pop(queues[++CURR_QUEUE]);
